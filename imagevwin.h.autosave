@@ -1,0 +1,17 @@
+#ifndef IMAGEVWIN_H
+#define IMAGEVWIN_H
+
+#include <QtWidgets/qabstractscrollarea.h>
+class QAbstractScrollArea;
+class ImagevWin : public QAbstractScrollArea
+{
+    Q_OBJECT
+public:
+    explicit ImagevWin(QWidget *parent = 0);
+    ~ImagevWin();
+signals:
+
+public slots:
+};
+
+#endif // IMAGEVWIN_H

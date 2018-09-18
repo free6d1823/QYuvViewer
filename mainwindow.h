@@ -4,8 +4,9 @@
 #include <QMainWindow>
 #include <QCloseEvent>
 class QAction;
-class QLabel;
+
 class QMenu;
+class ImageWin;
 class QScrollArea;
 class QScrollBar;
 
@@ -46,9 +47,7 @@ private:
 
     Ui::MainWindow *ui;
 
-    QImage mImage;
-    QLabel *mImageLabel;
-    QScrollArea *mScrollArea;
+    ImageWin *mImageView;
     double mZoomFactor;
     QAction *mSaveAsAct;
     QAction *mCopyAct;

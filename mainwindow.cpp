@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QLabel>
-#include <QScrollArea>
+#include <QScrollBar>
 #include <QToolBar>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -13,7 +13,8 @@
 #include <QList>
 #include <QClipboard>
 #include <QMimeData>
-#include <QScrollBar>
+#include <QScrollArea>
+#include "imagewin.h"
 
 #define CLIP(X) ( (X) > 255 ? 255 : (X) < 0 ? 0 : X)
 
@@ -82,19 +83,11 @@ static void YuyvToRgb32(unsigned char* pYuv, int width, int stride, int height, 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),ui(new Ui::MainWindow),
-    mImageLabel(new QLabel),
-    mScrollArea(new QScrollArea),
+    mImageView(new ImageWin),
     mZoomFactor(1)
 {
     ui->setupUi(this);
-    mImageLabel->setBackgroundRole(QPalette::Base);
-    mImageLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-    mImageLabel->setScaledContents(true);
-
-    mScrollArea->setBackgroundRole(QPalette::Dark);
-    mScrollArea->setWidget(mImageLabel);
-    mScrollArea->setVisible(false);
-    setCentralWidget(mScrollArea);
+    setCentralWidget(mImageView);
 
     createMenuAndToolbar();
     resize(QGuiApplication::primaryScreen()->availableSize() * 3 / 5);
@@ -122,7 +115,7 @@ bool MainWindow::loadFile(const QString &fileName)
     setWindowFilePath(fileName);
 
     const QString message = tr("Opened \"%1\", %2x%3, Depth: %4")
-        .arg(QDir::toNativeSeparators(fileName)).arg(mImage.width()).arg(mImage.height()).arg(mImage.depth());
+        .arg(QDir::toNativeSeparators(fileName)).arg(mImageView->getImage()->width()).arg(mImageView->getImage()->height()).arg(mImageView->getImage()->depth());
     statusBar()->showMessage(message);
     return true;
 }
@@ -181,7 +174,7 @@ bool MainWindow::loadFileYuv(const QString & filename, bool isPlanMode)
          setImage(*newImage);
          setWindowFilePath(filename);
          const QString message = tr("Opened \"%1\", %2x%3, Depth: %4")
-             .arg(QDir::toNativeSeparators(filename)).arg(mImage.width()).arg(mImage.height()).arg(mImage.depth());
+             .arg(QDir::toNativeSeparators(filename)).arg(mImageView->getImage()->width()).arg(mImageView->getImage()->height()).arg(mImageView->getImage()->depth());
          statusBar()->showMessage(message);
 
      }
@@ -194,22 +187,19 @@ bool MainWindow::loadFileYuv(const QString & filename, bool isPlanMode)
 
 void MainWindow::setImage(const QImage &newImage)
 {
-    mImage = newImage;
-    mImageLabel->setPixmap(QPixmap::fromImage(mImage));
     mZoomFactor = 1.0;
-
-    mScrollArea->setVisible(true);
+    mImageView->setImage(newImage);
     mFitToWindowAct->setEnabled(true);
     updateActions();
 
     if (!mFitToWindowAct->isChecked())
-        mImageLabel->adjustSize();
+        mImageView->adjustSize();
 }
 bool MainWindow::saveFile(const QString &fileName)
 {
     QImageWriter writer(fileName);
 
-    if (!writer.write(mImage)) {
+    if (!writer.write(*mImageView->getImage())) {
         QMessageBox::information(this, QGuiApplication::applicationDisplayName(),
                                  tr("Cannot write %1: %2")
                                  .arg(QDir::toNativeSeparators(fileName)), writer.errorString());
@@ -264,7 +254,7 @@ void MainWindow::onFileSaveAs()
 void MainWindow::onEditCopy()
 {
 #ifndef QT_NO_CLIPBOARD
-    QGuiApplication::clipboard()->setImage(mImage);
+    QGuiApplication::clipboard()->setImage(* mImageView->getImage());
 #endif // !QT_NO_CLIPBOARD
 }
 #ifndef QT_NO_CLIPBOARD
@@ -309,14 +299,14 @@ void MainWindow::onViewZoomout()
 
 void MainWindow::onViewNormalSize()
 {
-    mImageLabel->adjustSize();
+    mImageView->adjustSize();
     mZoomFactor = 1.0;
 }
 
 void MainWindow::onViewFitToWindow()
 {
     bool fitToWindow = mFitToWindowAct->isChecked();
-    mScrollArea->setWidgetResizable(fitToWindow);
+    mImageView->setWidgetResizable(fitToWindow);
     if (!fitToWindow)
         onViewNormalSize();
     updateActions();
@@ -406,20 +396,20 @@ void MainWindow::createMenuAndToolbar()
 }
 void MainWindow::updateActions()
 {
-    mSaveAsAct->setEnabled(!mImage.isNull());
-    mCopyAct->setEnabled(!mImage.isNull());
+    mSaveAsAct->setEnabled(!mImageView->getImage()->isNull());
+    mCopyAct->setEnabled(!mImageView->getImage()->isNull());
     mZoomInAct->setEnabled(!mFitToWindowAct->isChecked());
     mZoomOutAct->setEnabled(!mFitToWindowAct->isChecked());
     mNormalSizeAct->setEnabled(!mFitToWindowAct->isChecked());
 }
 void MainWindow::scaleImage(double factor)
 {
-    Q_ASSERT(mImageLabel->pixmap());
+//    Q_ASSERT(mImageLabel->pixmap());
     mZoomFactor *= factor;
-    mImageLabel->resize(mZoomFactor * mImageLabel->pixmap()->size());
-
-    adjustScrollBar(mScrollArea->horizontalScrollBar(), factor);
-    adjustScrollBar(mScrollArea->verticalScrollBar(), factor);
+ //   mImageLabel->resize(mZoomFactor * mImageLabel->pixmap()->size());
+    mImageView->scaleImage(mZoomFactor);
+    adjustScrollBar(mImageView->horizontalScrollBar(), factor);
+    adjustScrollBar(mImageView->verticalScrollBar(), factor);
 
     mZoomInAct->setEnabled(mZoomFactor < 10.0);
     mZoomOutAct->setEnabled(mZoomFactor > 0.1);
