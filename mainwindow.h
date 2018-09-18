@@ -21,6 +21,7 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     bool loadFile(const QString &);
+    bool loadFileYuv(const QString & filename, bool isPlanMode=true);
 
 protected:
     void closeEvent(QCloseEvent *event) override;

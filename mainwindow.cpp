@@ -15,6 +15,71 @@
 #include <QMimeData>
 #include <QScrollBar>
 
+#define CLIP(X) ( (X) > 255 ? 255 : (X) < 0 ? 0 : X)
+
+
+// YUV -> RGB
+#define C(Y) ( (Y) - 16  )
+#define D(U) ( (U) - 128 )
+#define E(V) ( (V) - 128 )
+
+#define YUV2R(Y, U, V) CLIP(( 298 * C(Y)              + 409 * E(V) + 128) >> 8)
+#define YUV2G(Y, U, V) CLIP(( 298 * C(Y) - 100 * D(U) - 208 * E(V) + 128) >> 8)
+#define YUV2B(Y, U, V) CLIP(( 298 * C(Y) + 516 * D(U)              + 128) >> 8)
+//////
+/// \brief YuyvToRgb32 YUV420 to RGBA 32
+/// \param pYuv
+/// \param width
+/// \param stride
+/// \param height
+/// \param pRgb     output RGB32 buffer
+/// \param uFirst   true if pYuv is YUYV, false if YVYU
+///
+static void YuyvToRgb32(unsigned char* pYuv, int width, int stride, int height, unsigned char* pRgb, bool uFirst)
+{
+    //YVYU - format
+    int nBps = width*4;
+    unsigned char* pY1 = pYuv;
+
+    unsigned char* pV;
+    unsigned char* pU;
+
+    if (uFirst) {
+        pU = pY1+1; pV = pU+2;
+    } else {
+        pV = pY1+1; pU = pV+2;
+    }
+
+
+    unsigned char* pLine1 = pRgb;
+
+    unsigned char y1,u,v;
+    for (int i=0; i<height; i++)
+    {
+        for (int j=0; j<width; j+=2)
+        {
+            y1 = pY1[2*j];
+            u = pU[2*j];
+            v = pV[2*j];
+            pLine1[j*4] = YUV2B(y1, u, v);//b
+            pLine1[j*4+1] = YUV2G(y1, u, v);//g
+            pLine1[j*4+2] = YUV2R(y1, u, v);//r
+            pLine1[j*4+3] = 0xff;
+
+            y1 = pY1[2*j+2];
+            pLine1[j*4+4] = YUV2B(y1, u, v);//b
+            pLine1[j*4+5] = YUV2G(y1, u, v);//g
+            pLine1[j*4+6] = YUV2R(y1, u, v);//r
+            pLine1[j*4+7] = 0xff;
+        }
+        pY1 += stride;
+        pV += stride;
+        pU += stride;
+        pLine1 += nBps;
+
+    }
+}
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),ui(new Ui::MainWindow),
     mImageLabel(new QLabel),
@@ -61,6 +126,72 @@ bool MainWindow::loadFile(const QString &fileName)
     statusBar()->showMessage(message);
     return true;
 }
+bool MainWindow::loadFileYuv(const QString & filename, bool isPlanMode)
+{
+
+    QFile fp(filename);
+     if(!fp.open(QIODevice::ReadOnly))
+             return false;
+     //check filename and dimension
+
+    char value[32];
+    const char* pname = filename.toUtf8().data();
+    const char* p1 = strchr(pname, '_');
+    const char* p2 = strchr(pname, '.');
+    int length = p2-p1-1;
+    if (p1 == NULL || p2 == NULL || length <3 || length>= (int) sizeof(value)-1){
+        fp.close();
+
+        QMessageBox::information(this, QGuiApplication::applicationDisplayName(),
+                                 tr("File name must be in the format of abc_widthxheight.yuv!"));
+        return false;
+    }
+
+    memcpy(value, p1+1, length);
+    value[length] = 0;
+    p1 = strchr(value, 'x');
+    if (!p1) {
+        QMessageBox::information(this, QGuiApplication::applicationDisplayName(),
+                                 tr("File name must be in the form of abc_widthxheight.yuv!"));
+        return false;
+    }
+    *(char*) p1 = 0;
+
+    int width = atoi(value);
+    int height = atoi(p1+1);
+
+     unsigned char* m_pRgb32 = (unsigned char*) malloc(width*4*height);
+     if (!m_pRgb32) return false;
+     void* pYuv = malloc(width*2*height);
+     if (!pYuv) {
+         free(m_pRgb32);
+         return false;
+     }
+     QImage* newImage = NULL;
+     if ( fp.read((char* )pYuv, width*2*height) >0){
+         YuyvToRgb32((unsigned char*)pYuv, width, width*2, height,
+                                 m_pRgb32, true);
+         free(pYuv);
+         newImage = new QImage(m_pRgb32,
+                     width, height, QImage::Format_RGBA8888);
+
+     }
+     fp.close();
+     if(newImage) {
+         setImage(*newImage);
+         setWindowFilePath(filename);
+         const QString message = tr("Opened \"%1\", %2x%3, Depth: %4")
+             .arg(QDir::toNativeSeparators(filename)).arg(mImage.width()).arg(mImage.height()).arg(mImage.depth());
+         statusBar()->showMessage(message);
+
+     }
+     else {
+              QMessageBox::information(this, QGuiApplication::applicationDisplayName(),
+                                       tr("Failed to read file!"));
+          }
+     return (newImage!=NULL);
+}
+
 void MainWindow::setImage(const QImage &newImage)
 {
     mImage = newImage;
@@ -98,26 +229,30 @@ static void initializeImageFileDialog(QFileDialog &dialog, QFileDialog::AcceptMo
         const QStringList picturesLocations = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
         dialog.setDirectory(picturesLocations.isEmpty() ? QDir::currentPath() : picturesLocations.last());
     }
-
-    QStringList mimeTypeFilters;
-    const  QList<QByteArray> supportedMimeTypes = acceptMode == QFileDialog::AcceptOpen
-        ? QImageReader::supportedMimeTypes() : QImageWriter::supportedMimeTypes();
-    foreach (const QByteArray &mimeTypeName, supportedMimeTypes)
-        mimeTypeFilters.append(mimeTypeName);
-    mimeTypeFilters.sort();
-    dialog.setMimeTypeFilters(mimeTypeFilters);
-    dialog.selectMimeTypeFilter("image/jpeg");
-    if (acceptMode == QFileDialog::AcceptSave)
+    QStringList filters;
+    filters << "YUYV packet mode (*.yuv)"
+            << "Image files (*.png *.xpm *.jpg)";
+    dialog.setNameFilters(filters);;
+   if (acceptMode == QFileDialog::AcceptSave)
         dialog.setDefaultSuffix("jpg");
 }
 void MainWindow::onFileOpen()
 {
-    QFileDialog dialog(this, tr("Open File"));
-    initializeImageFileDialog(dialog, QFileDialog::AcceptOpen);
+    QString filename = QFileDialog::getOpenFileName(this,tr("Open Imahe"), QDir::currentPath(),
+          tr("YUYV packet mode (*.yuv);;"
+              "Image files (*.png *.xpm *.jpg)") );
 
-    while (dialog.exec() == QDialog::Accepted && !loadFile(dialog.selectedFiles().first())) {}
+    if (!filename.isNull()){
+        if(filename.contains(".yuv"))
+            loadFileYuv(filename);
+        else if(filename.contains(".yuyv"))
+            loadFileYuv(filename, false);
+        else
+            loadFile(filename);
+    }
 
 }
+
 void MainWindow::onFileSaveAs()
 {
     QFileDialog dialog(this, tr("Save File As"));
