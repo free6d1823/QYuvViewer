@@ -10,5 +10,6 @@
         <file>images/normalsize.png</file>
         <file>images/copy.png</file>
         <file>images/paste.png</file>
+        <file>images/ruler.png</file>
     </qresource>
 </RCC>

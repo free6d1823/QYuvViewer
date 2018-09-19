@@ -173,8 +173,10 @@ bool MainWindow::loadFileYuv(const QString & filename, bool isPlanMode)
      if(newImage) {
          setImage(*newImage);
          setWindowFilePath(filename);
-         const QString message = tr("Opened \"%1\", %2x%3, Depth: %4")
-             .arg(QDir::toNativeSeparators(filename)).arg(mImageView->getImage()->width()).arg(mImageView->getImage()->height()).arg(mImageView->getImage()->depth());
+         QString file1 = QDir::toNativeSeparators(filename);
+         QImage* pImg = mImageView->getImage();
+         QString message = tr("Opened \"%1\", %2x%3, Depth: 32")
+             .arg(file1).arg(width).arg(height);
          statusBar()->showMessage(message);
 
      }
@@ -311,6 +313,10 @@ void MainWindow::onViewFitToWindow()
         onViewNormalSize();
     updateActions();
 }
+void MainWindow::onViewShowRuler()
+{
+    mImageView->showRulers(!mImageView->isRulersShown());
+}
 
 void MainWindow::onHelpAbout()
 {
@@ -380,10 +386,19 @@ void MainWindow::createMenuAndToolbar()
     mFitToWindowAct->setCheckable(true);
     mFitToWindowAct->setShortcut(tr("Ctrl+F"));
 
+    const QIcon rulerIcon = QIcon(":/images/ruler.png");
+    QAction* rulerAct = viewMenu->addAction(rulerIcon, tr("Show &Ruler"), this,
+                     SLOT(onViewShowRuler()), tr("Ctrl+R") );
+    viewMenu->addSeparator();
+    rulerAct->setStatusTip(tr("Toggle rulers."));
+    rulerAct->setEnabled(true);
+
     fileToolBar->addAction(mZoomInAct);
     fileToolBar->addAction(mZoomOutAct);
     fileToolBar->addAction(mNormalSizeAct);
+    fileToolBar->addSeparator() ;
     fileToolBar->addAction(mFitToWindowAct);
+    fileToolBar->addAction(rulerAct);
     fileToolBar->addSeparator() ;
 
     QMenu* helpMenu = ui->menuBar->addMenu(tr("&Help"));

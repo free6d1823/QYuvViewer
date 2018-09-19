@@ -36,6 +36,7 @@ private slots:
      void onViewZoomout();
      void onViewNormalSize();
      void onViewFitToWindow();
+     void onViewShowRuler();
      void onHelpAbout();
 private:
     void createMenuAndToolbar();
