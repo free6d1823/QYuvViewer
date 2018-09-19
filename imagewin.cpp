@@ -207,10 +207,7 @@ bool ImageWin::isRulersShown()
 {
       return mHorzRuler->isVisible();
 }
-void ImageWin::paintEvent(QPaintEvent* event)
-{
-    QScrollArea::paintEvent(event);
-}
+
 void ImageWin::mouseMoveEvent(QMouseEvent* event)
 {
     mHorzRuler->setCursorPos(event->pos());

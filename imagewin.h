@@ -105,7 +105,6 @@ public:
     explicit ImageWin(QWidget *parent = 0);
     ~ImageWin();
     void scrollContentsBy(int dx, int dy);
-    void paintEvent(QPaintEvent* /*event*/);
     void mouseMoveEvent(QMouseEvent* event);
 
     void setImage(const QImage &newImage);

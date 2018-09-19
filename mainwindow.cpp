@@ -174,7 +174,6 @@ bool MainWindow::loadFileYuv(const QString & filename, bool isPlanMode)
          setImage(*newImage);
          setWindowFilePath(filename);
          QString file1 = QDir::toNativeSeparators(filename);
-         QImage* pImg = mImageView->getImage();
          QString message = tr("Opened \"%1\", %2x%3, Depth: 32")
              .arg(file1).arg(width).arg(height);
          statusBar()->showMessage(message);
